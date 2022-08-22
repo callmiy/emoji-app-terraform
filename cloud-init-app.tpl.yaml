@@ -1,0 +1,22 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+  - ca-certificates
+  - uidmap
+
+runcmd:
+  - curl -fLo docker-install.sh https://get.docker.com/
+  - bash docker-install.sh
+  - dockerd-rootless-setuptool.sh install
+  - loginctl enable-linger ca
+  - usermod -aG docker ca
+  - chmod 666 /var/run/docker.sock
+  - source /home/ca/.bashrc
+  - docker login --username samba6 --password ${DOCKER_PASSWORD}
+  - docker pull samba6/kanmii:emojis__0.0.0
+  - docker run --detach --publish 80:8080 samba6/kanmii:emojis__0.0.0
