@@ -16,13 +16,13 @@ terraform {
 # START PROVIDERS
 # -----------------------------------------------------------------------------
 provider "aws" {
-  region = "us-east-1"
+  # region = "us-east-1"
 
-  shared_credentials_files = [
-    "~/.aws/credentials"
-  ]
+  # shared_credentials_files = [
+  #   "~/.aws/credentials"
+  # ]
 
-  profile = "default"
+  # profile = "default"
 }
 
 # provider "docker" {}
@@ -31,145 +31,55 @@ provider "aws" {
 # END PROVIDERS
 # -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# START VARIABLES
-# -----------------------------------------------------------------------------
+# resource "aws_vpc" "emoji_app_vpc" {
+#   cidr_block           = var.vpc_cidr
+#   enable_dns_support   = true
+#   enable_dns_hostnames = true
+#
+#   tags = {
+#     Name = "${var.app_name}_vpc"
+#   }
+# }
 
-variable "host_os" {
-  type = string
-}
+# resource "aws_subnet" "emoji_app_subnet-1a" {
+#   vpc_id                  = data.aws_vpc.emoji_app_vpc.id
+#   cidr_block              = var.vpc_cidr
+#   map_public_ip_on_launch = true
+#   # availability_zone       = "us-east-1a"
+#
+#   tags = {
+#     Name = "${var.app_name}-public-subnet"
+#   }
+# }
 
-variable "app-name" {
-  type    = string
-  default = "emoji_app"
-}
 
-variable "vpc-cidr" {
-  type    = string
-  default = "192.168.0.0/20"
-}
 
-variable "DOCKER_PASSWORD" {
-  type = string
-}
-# -----------------------------------------------------------------------------
-# END VARIABLES
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-# START LOCAL
-# -----------------------------------------------------------------------------
-locals {
-  nginx_conf_text = base64encode(templatefile("./nginx.tpl.conf", {
-    instance0 = aws_instance.emoji_app[0].private_ip
-    instance1 = aws_instance.emoji_app[1].private_ip
-  }))
-
-  ssh_key = file("~/.ssh/mtc-key.pub")
-}
-# -----------------------------------------------------------------------------
-# END LOCALS
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-# START DATA
-# -----------------------------------------------------------------------------
-data "cloudinit_config" "user_data_lb" {
-  gzip          = false
-  base64_encode = false
-
-  part {
-    content_type = "text/cloud-config"
-    filename     = "cloud-config.yaml"
-    content = templatefile("./cloud-init-lb.yaml", {
-      nginx_conf_text = local.nginx_conf_text,
-    })
-  }
-
-  part {
-    content_type = "text/x-shellscript"
-    filename     = "/tmp/example.sh"
-    content      = <<-EOF
-      #!/bin/bash
-      echo "Hello World"
-    EOF
-  }
-}
-data "cloudinit_config" "user_data_app" {
-  gzip          = false
-  base64_encode = false
-
-  part {
-    content_type = "text/cloud-config"
-    filename     = "cloud-config.yaml"
-    content = templatefile("cloud-init-app.tpl.yaml", {
-      ssh_key         = local.ssh_key
-      DOCKER_PASSWORD = var.DOCKER_PASSWORD
-    })
-  }
-}
-
-data "aws_ami" "server_ami" {
-  most_recent = true
-  owners = [
-    "099720109477"
-  ]
-
-  filter {
-    name = "name"
-    values = [
-      "ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"
-    ]
-  }
-}
-# -----------------------------------------------------------------------------
-# END DATA
-# -----------------------------------------------------------------------------
-
-resource "aws_vpc" "emoji_app_vpc" {
-  cidr_block           = var.vpc-cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
-  tags = {
-    Name = "${var.app-name}_vpc"
-  }
-}
-
-resource "aws_subnet" "emoji_app_subnet-1a" {
-  vpc_id                  = aws_vpc.emoji_app_vpc.id
-  cidr_block              = var.vpc-cidr
-  map_public_ip_on_launch = true
-  availability_zone       = "us-east-1a"
-
-  tags = {
-    Name = "${var.app-name}-public-subnet"
-  }
-}
-
-resource "aws_internet_gateway" "emoji_app_internet_gateway" {
-  vpc_id = aws_vpc.emoji_app_vpc.id
-
-  tags = {
-    Name = "${var.app-name}-igw"
-  }
-}
+# resource "aws_internet_gateway" "emoji_app_internet_gateway" {
+#   vpc_id = data.aws_vpc.emoji_app_vpc.id
+#
+#   tags = {
+#     Name = "${var.app_name}-igw"
+#   }
+# }
 
 resource "aws_route_table" "emoji_app_public_rt" {
-  vpc_id = aws_vpc.emoji_app_vpc.id
+  # vpc_id = aws_vpc.emoji_app_vpc.id
+  vpc_id = data.aws_vpc.emoji_app_vpc.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.emoji_app_internet_gateway.id
+    # gateway_id = aws_internet_gateway.emoji_app_internet_gateway.id
+    gateway_id = var.default_igw
   }
 
   tags = {
-    Name = "${var.app-name}-public-rt"
+    Name = "${var.app_name}-public-rt"
   }
 }
 
 resource "aws_route_table_association" "emoji_app_public_rt_assoc" {
-  subnet_id      = aws_subnet.emoji_app_subnet-1a.id
+  # subnet_id      = aws_subnet.emoji_app_subnet-1a.id
+  subnet_id      = var.default_subnet_id
   route_table_id = aws_route_table.emoji_app_public_rt.id
 }
 
@@ -179,7 +89,8 @@ resource "aws_route_table_association" "emoji_app_public_rt_assoc" {
 # now modify this ingress rule to let in traffic from any machine within the
 # VPC
 resource "aws_default_security_group" "default" {
-  vpc_id = aws_vpc.emoji_app_vpc.id
+  # vpc_id = aws_vpc.emoji_app_vpc.id
+  vpc_id = data.aws_vpc.emoji_app_vpc.id
 
   ingress {
     protocol = -1
@@ -191,7 +102,7 @@ resource "aws_default_security_group" "default" {
     # There is no cidr_blocks entry in the default config. We put it here
     # because we need to modify the default config
     cidr_blocks = [
-      var.vpc-cidr
+      var.vpc_cidr
     ]
   }
 
@@ -206,9 +117,10 @@ resource "aws_default_security_group" "default" {
 }
 
 resource "aws_security_group" "emoji_app_public_sg" {
-  name        = "${var.app-name}-public-sg"
-  description = "${var.app-name} public security group"
-  vpc_id      = aws_vpc.emoji_app_vpc.id
+  name        = "${var.app_name}-public-sg"
+  description = "${var.app_name} public security group"
+  # vpc_id      = aws_vpc.emoji_app_vpc.id
+  vpc_id = data.aws_vpc.emoji_app_vpc.id
 
   ingress {
     description = "SSH from allowed IP address list"
@@ -240,7 +152,7 @@ resource "aws_security_group" "emoji_app_public_sg" {
   }
 
   tags = {
-    Name = "${var.app-name}-public-sg"
+    Name = "${var.app_name}-public-sg"
   }
 }
 
@@ -251,14 +163,16 @@ resource "aws_key_pair" "mtc_auth" {
 
 resource "aws_instance" "emoji_app-lb" {
   # count         = 1
-  ami               = data.aws_ami.server_ami.id
-  instance_type     = "t2.micro"
-  availability_zone = "us-east-1a"
-  key_name          = aws_key_pair.mtc_auth.id
+  ami           = data.aws_ami.server_ami.id
+  instance_type = "t2.micro"
+  # availability_zone = "us-east-1a"
+  key_name = aws_key_pair.mtc_auth.id
+
   vpc_security_group_ids = [
-    aws_security_group.emoji_app_public_sg.id
+    aws_security_group.emoji_app_public_sg.id,
   ]
-  subnet_id                   = aws_subnet.emoji_app_subnet-1a.id
+  # subnet_id                   = aws_subnet.emoji_app_subnet-1a.id
+  subnet_id                   = var.default_subnet_id
   associate_public_ip_address = true
   user_data                   = data.cloudinit_config.user_data_lb.rendered
 
@@ -266,41 +180,49 @@ resource "aws_instance" "emoji_app-lb" {
     volume_size = 8
   }
 
-  provisioner "local-exec" {
-    command = templatefile("ssh-config.tpl.sh", {
-      host         = self.tags.Name
-      ip           = self.public_ip
-      user         = "ubuntu"
-      identityfile = "~/.ssh/mtc-key"
-    })
-
-    interpreter = ["bash", "-c"]
-  }
+  # provisioner "local-exec" {
+  #   command = templatefile("ssh-config.tpl.sh", {
+  #     host         = self.tags.Name
+  #     ip           = self.public_ip
+  #     user         = "ubuntu"
+  #     identityfile = "~/.ssh/mtc-key"
+  #   })
+  #
+  #   interpreter = ["bash", "-c"]
+  # }
 
   tags = {
-    Name = "${var.app-name}-lb"
+    Name = "${var.app_name}-lb"
   }
 }
 
 resource "aws_instance" "emoji_app" {
-  count             = 2
-  ami               = data.aws_ami.server_ami.id
-  instance_type     = "t2.micro"
-  availability_zone = "us-east-1a"
+  count = 2
+  ami   = data.aws_ami.server_ami.id
+
+  instance_type = "t2.micro"
+  # availability_zone = "us-east-1a"
+  # key_name = aws_key_pair.mtc_auth.id
 
   vpc_security_group_ids = [
+    # aws_security_group.emoji_app_public_sg.id,
     aws_default_security_group.default.id,
   ]
 
-  subnet_id                   = aws_subnet.emoji_app_subnet-1a.id
+  # subnet_id                   = aws_subnet.emoji_app_subnet-1a.id
+  subnet_id = var.default_subnet_id
+
+  # Without `associate_public_ip_address = true`, machines on same
+  # vpc subnet can not access http traffic ???
   associate_public_ip_address = true
-  user_data                   = data.cloudinit_config.user_data_app.rendered
+
+  user_data = data.cloudinit_config.user_data_app.rendered
 
   root_block_device {
     volume_size = 8
   }
 
   tags = {
-    Name = "${var.app-name}-${count.index}"
+    Name = "${var.app_name}-${count.index}"
   }
 }

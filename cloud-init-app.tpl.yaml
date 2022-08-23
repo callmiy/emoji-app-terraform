@@ -19,4 +19,4 @@ runcmd:
   - source /home/ca/.bashrc
   - docker login --username samba6 --password ${DOCKER_PASSWORD}
   - docker pull samba6/kanmii:emojis__0.0.0
-  - docker run --detach --publish 80:8080 samba6/kanmii:emojis__0.0.0
+  - docker run --detach --publish ${app_docker_published_http_port}:8080 samba6/kanmii:emojis__0.0.0
