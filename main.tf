@@ -95,15 +95,15 @@ resource "aws_default_security_group" "default" {
   ingress {
     protocol = -1
     # This security group is the source of inbound traffic
-    # self      = true
+    self      = true
     from_port = 0
     to_port   = 0
 
     # There is no cidr_blocks entry in the default config. We put it here
     # because we need to modify the default config
-    cidr_blocks = [
-      var.vpc_cidr
-    ]
+    # cidr_blocks = [
+    #   var.vpc_cidr
+    # ]
   }
 
   egress {
@@ -164,16 +164,23 @@ resource "aws_key_pair" "mtc_auth" {
 resource "aws_instance" "emoji_app-lb" {
   # count         = 1
   ami           = data.aws_ami.server_ami.id
+
   instance_type = "t2.micro"
+
   # availability_zone = "us-east-1a"
+
   key_name = aws_key_pair.mtc_auth.id
 
   vpc_security_group_ids = [
     aws_security_group.emoji_app_public_sg.id,
+    aws_default_security_group.default.id,
   ]
+
   # subnet_id                   = aws_subnet.emoji_app_subnet-1a.id
   subnet_id                   = var.default_subnet_id
+
   associate_public_ip_address = true
+
   user_data                   = data.cloudinit_config.user_data_lb.rendered
 
   root_block_device {
