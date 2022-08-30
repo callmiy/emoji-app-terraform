@@ -163,7 +163,7 @@ resource "aws_key_pair" "mtc_auth" {
 
 resource "aws_instance" "emoji_app-lb" {
   # count         = 1
-  ami           = data.aws_ami.server_ami.id
+  ami = data.aws_ami.server_ami.id
 
   instance_type = "t2.micro"
 
@@ -177,11 +177,11 @@ resource "aws_instance" "emoji_app-lb" {
   ]
 
   # subnet_id                   = aws_subnet.emoji_app_subnet-1a.id
-  subnet_id                   = var.default_subnet_id
+  subnet_id = var.default_subnet_id
 
   associate_public_ip_address = true
 
-  user_data                   = data.cloudinit_config.user_data_lb.rendered
+  user_data = data.cloudinit_config.user_data_lb.rendered
 
   root_block_device {
     volume_size = 8
